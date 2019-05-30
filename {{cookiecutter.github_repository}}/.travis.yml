@@ -2,50 +2,43 @@
 # see the Travis CI documentation: https://docs.travis-ci.com
 
 language: python
-sudo: false
+dist: xenial
 python:
-- '3.6.4'
+  - '3.6'
 
-addons:
-  postgresql: "11"
-  apt:
-    packages:
-      - postgresql-11
-      - postgresql-client-11
+node_js:
+  - "10"
+
+services:
+  - docker
+
+cache:
+  pip: true
+  directories:
+  - node_modules  # NPM packages
 
 env:
   global:
+  # These env var are used by createdb/dropdb/psql commands.
+  - PGDATABASE=localhost
+  - PGHOST=localhost
+  - PGUSER=postgres
   - PGPORT=5432
+  - DATABASE_URL=postgres://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}
+  - DOCKER_POSTGRES_IMAGE=mdillon/postgis:11
 
-cache:
-  directories:
-    - $HOME/.cache/pip
-
-before_cache:
-  - rm -f $HOME/.cache/pip/log/debug.log
+before_script:
+  - sudo service postgresql stop
+  - docker run --rm --name pg-docker -d -p ${PGPORT}:5432 --tmpfs /var/lib/postgresql/data:rw ${DOCKER_POSTGRES_IMAGE}
+  {%- if cookiecutter.postgis.lower() == 'y' %}
+  - psql -c "CREATE EXTENSION postgis;"  # @TODO: Fix this
+  {%- endif %}
 
 install:
   - pip install -r requirements/development.txt
   {%- if cookiecutter.webpack.lower() == 'y' %}
-  - nvm install v6.3.0
-  - npm install -g npm
   - npm install
   {%- endif %}
-
-before_script:
-- export DATABASE_URL=postgres://postgres@localhost/{{ cookiecutter.main_module }}
-- psql -c "CREATE DATABASE {{ cookiecutter.main_module }};" -U postgres
-{%- if cookiecutter.postgis.lower() == 'y' %}
-- psql -c "CREATE EXTENSION postgis;" -U postgres -d {{ cookiecutter.main_module }}
-{%- endif %}
-- cp config/database.yml.travis config/database.yml
-
-before_install:
-  - sudo apt-get update
-  - sudo apt-get --yes remove postgresql\*
-  - sudo apt-get install -y postgresql-11 postgresql-client-11
-  - sudo cp /etc/postgresql/{9.4,11}/main/pg_hba.conf
-  - sudo service postgresql restart 11
 
 script:
 - flake8

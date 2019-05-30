@@ -17,6 +17,7 @@ services:
 
 env:
   global:
+  # These env var are used by createdb/dropdb/psql commands.
   - PGHOST=localhost
   - PGUSER=postgres
   - PGPORT=5432
